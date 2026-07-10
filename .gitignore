@@ -1,0 +1,33 @@
+# ─── Environment & Config (contains credentials, keys, secrets) ───
+/config/database.php
+/config/env.php
+
+# ─── Storage: Guest ID documents, bills, logs ───
+/storage/ids/
+/storage/bills/
+/storage/logs/
+
+# ─── OS junk ───
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# ─── IDE / Editor ───
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.netbeans/
+nbproject/
+
+# ─── Build artifacts ───
+/node_modules/
+/vendor/
+/.cache/
+
+# ─── Tailwind config (generated from CDN; keep example if tracked) ───
+/tailwind.config.js

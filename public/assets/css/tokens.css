@@ -1,0 +1,70 @@
+:root {
+  /* Brand purple ramp */
+  --color-brand-50: #F5EEFF;
+  --color-brand-100: #E7D8FF;
+  --color-brand-200: #CEB0FF;
+  --color-brand-300: #B486FF;
+  --color-brand-400: #9759F0;
+  --color-brand-500: #6C2BD9;
+  --color-brand-600: #5A24B3;
+  --color-brand-700: #471C89;
+  --color-brand-800: #36145F;
+  --color-brand-900: #251031;
+
+  /* Neutral gray scale */
+  --color-neutral-50: #F8F8FB;
+  --color-neutral-100: #EFF0F5;
+  --color-neutral-200: #D8DAE5;
+  --color-neutral-300: #BFC3D6;
+  --color-neutral-400: #9EA3B8;
+  --color-neutral-500: #6E738A;
+
+  /* Semantic colors */
+  --color-success: #2EBF8F;
+  --color-success-bg: #E6FBF1;
+  --color-warning: #D48B2F;
+  --color-warning-bg: #FFF4E1;
+  --color-error: #D9468F;
+  --color-error-bg: #FDE8F4;
+  --color-info: #5C7CE6;
+  --color-info-bg: #EBF0FF;
+
+  /* Room status colors */
+  --color-room-status-clean: #2EB38B;
+  --color-room-status-dirty: #DF7A00;
+  --color-room-status-inspect: #7C5CD8;
+  --color-room-status-out_of_order: #D92B5E;
+
+  /* Task priority colors */
+  --color-task-priority-urgent: #C92B5A;
+  --color-task-priority-normal: #5C627A;
+
+  /* Typography */
+  --font-family-heading: 'Poppins', system-ui, sans-serif;
+  --font-family-body: 'Inter', system-ui, sans-serif;
+  --font-size-h1: 2.5rem;
+  --font-size-h2: 2rem;
+  --font-size-h3: 1.5rem;
+  --font-size-h4: 1.25rem;
+  --font-size-body: 1rem;
+  --font-size-body-small: 0.8125rem;
+  --line-height-heading: 1.15;
+  --line-height-body: 1.6;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  /* Border radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+  --radius-pill: 9999px;
+}
