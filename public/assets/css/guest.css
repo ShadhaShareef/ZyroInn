@@ -103,7 +103,7 @@ main { flex: 1; }
 }
 .main-content-narrow {
   max-width: 36rem; margin: 0 auto;
-  padding: var(--space-4) var(--space-4) 0;
+  padding: var(--space-4) var(--space-4) 5rem;
   display: flex; flex-direction: column;
   gap: var(--space-8);
 }
@@ -1120,6 +1120,105 @@ textarea.input { min-height: 5rem; resize: vertical; }
 /* ============================================================
    SERVICE CARD
    ============================================================ */
+/* ============================================================
+   SERVICES SECTIONS ACCORDION
+   ============================================================ */
+.services-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.services-section {
+  background: #fff;
+  border: 1px solid var(--neutral-100);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.services-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-4);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brand-900);
+  border-left: 4px solid var(--section-accent, var(--brand-500));
+  transition: background var(--transition-ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.services-section-header:hover {
+  background: var(--neutral-50);
+}
+.services-section-label {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brand-900);
+}
+.services-section-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+.services-section-count {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--neutral-400);
+  font-weight: 500;
+}
+.services-section-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--neutral-300);
+  transition: transform var(--transition-smooth);
+}
+.services-section-arrow.is-open {
+  transform: rotate(90deg);
+  color: var(--section-accent, var(--brand-500));
+}
+.services-section-body {
+  border-top: 1px solid var(--neutral-100);
+}
+.services-items {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.svc-category-heading {
+  font-family: var(--font-heading);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--neutral-400);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: var(--space-3) 0 var(--space-2);
+  padding: 0 var(--space-1);
+}
+.svc-category-heading:first-child {
+  margin-top: 0;
+}
+.service-card-subcat {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-400);
+  margin-bottom: var(--space-2);
+}
 .service-card {
   background: #fff;
   border: 1px solid var(--neutral-100);
@@ -1138,6 +1237,367 @@ textarea.input { min-height: 5rem; resize: vertical; }
   margin-top: var(--space-2); font-size: 0.6875rem; color: var(--neutral-500);
 }
 .service-card-price { font-weight: 600; }
+
+/* ============================================================
+   ORDER STATUS CARD
+   ============================================================ */
+.order-status-card {
+  margin-bottom: var(--space-3);
+}
+.order-status-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: var(--space-3);
+}
+.status-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  position: relative;
+}
+.status-step + .status-step::before {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: var(--neutral-200);
+  margin: 0 var(--space-2);
+}
+.status-step--active + .status-step--active::before {
+  background: var(--brand-500);
+}
+.status-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--neutral-200);
+  flex-shrink: 0;
+}
+.status-step--active .status-step-dot {
+  background: var(--brand-500);
+}
+.status-step-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--neutral-400);
+  white-space: nowrap;
+}
+.status-step--active .status-step-label {
+  color: var(--brand-700);
+}
+.status-badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+}
+.status-pending { background: var(--warning-bg); color: #B87A1E; }
+.status-preparing { background: var(--info-bg); color: #3B5FD9; }
+.status-delivered { background: var(--success-bg); color: #1A8F6E; }
+.status-cancelled { background: #FEE2E2; color: #B91C1C; }
+
+/* ============================================================
+   ORDER TRAY (persistent sticky card)
+   ============================================================ */
+.order-tray {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  cursor: pointer;
+  background: #fff;
+  border-top: 1px solid var(--neutral-100);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  transition: box-shadow var(--transition-ease);
+}
+.order-tray:hover { box-shadow: 0 -6px 24px rgba(0,0,0,0.12); }
+.order-tray:focus-visible { outline: 2px solid var(--brand-400); outline-offset: -2px; }
+.order-tray-inner {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  position: relative;
+}
+.order-tray-icon {
+  display: flex;
+  align-items: center;
+  color: var(--brand-400);
+  flex-shrink: 0;
+}
+.order-tray-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--brand-900);
+}
+.order-tray-divider {
+  color: var(--neutral-300);
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+.order-tray-total {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--brand-500);
+  flex: 1;
+}
+.order-tray-placeholder {
+  flex: 1;
+  font-size: 0.8125rem;
+  color: var(--neutral-400);
+  font-weight: 500;
+}
+.order-tray-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--neutral-50);
+  color: var(--neutral-400);
+  font-size: 1.125rem;
+  transition: background var(--transition-ease), transform var(--transition-ease);
+  flex-shrink: 0;
+}
+.order-tray:hover .order-tray-arrow {
+  background: var(--brand-50);
+  color: var(--brand-500);
+  transform: translateX(2px);
+}
+.order-tray-badge {
+  position: absolute;
+  top: -6px;
+  inset-inline-start: calc(50% + 1.5rem);
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--brand-500);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(108,43,217,0.3);
+}
+
+/* ============================================================
+   TRAY PROMPT (empty state when no items added yet)
+   ============================================================ */
+.tray-prompt {
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+  color: var(--neutral-400);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.tray-prompt strong {
+  color: var(--brand-600);
+}
+
+/* ============================================================
+   ORDER TOAST (transient add confirmation)
+   ============================================================ */
+.order-toast {
+  position: fixed;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: var(--brand-900);
+  color: #fff;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-elevated);
+  pointer-events: none;
+}
+
+/* ============================================================
+   ROOM SERVICE CARD (tray-based flow)
+   ============================================================ */
+.room-service-card .btn-success {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.room-service-card .btn-success:hover {
+  background: #269E78;
+  border-color: #269E78;
+}
+.room-service-card .btn[disabled] {
+  opacity: 1;
+  cursor: default;
+}
+
+/* ============================================================
+   REVIEW SHEET — ORDER ITEMS
+   ============================================================ */
+.review-panel {
+  padding: var(--space-5) var(--space-5) 0;
+}
+.review-room-confirm {
+  font-size: 0.75rem;
+  color: var(--neutral-400);
+  margin-top: 0.125rem;
+}
+.review-body {
+  margin-top: var(--space-4);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.review-items {
+  display: flex;
+  flex-direction: column;
+}
+.review-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--neutral-100);
+}
+.review-item:last-of-type { border-bottom: none; }
+.review-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+.review-item-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--brand-900);
+}
+.review-item-price {
+  font-size: 0.75rem;
+  color: var(--neutral-500);
+}
+.review-item-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--neutral-50);
+  color: var(--neutral-400);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-ease), color var(--transition-ease);
+}
+.review-item-remove:hover {
+  background: var(--error-bg);
+  color: var(--error);
+}
+.review-empty {
+  text-align: center;
+  padding: var(--space-8) 0;
+  color: var(--neutral-400);
+  font-size: 0.875rem;
+}
+.review-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+  color: var(--neutral-200);
+}
+.review-empty-hint {
+  font-size: 0.75rem;
+  margin-top: var(--space-2);
+}
+.review-empty-hint strong {
+  color: var(--brand-500);
+}
+.review-summary {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 2px solid var(--brand-500);
+}
+.review-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+}
+.review-summary-label {
+  font-size: 0.875rem;
+  color: var(--neutral-500);
+}
+.review-summary-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--brand-900);
+}
+.review-summary-total {
+  border-top: 1px solid var(--neutral-100);
+  margin-top: var(--space-1);
+  padding-top: var(--space-3);
+}
+.review-summary-total .review-summary-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-900);
+}
+.review-summary-total .review-summary-value {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--brand-500);
+}
+.review-notes {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--neutral-100);
+}
+.review-footer {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: var(--space-4) 0 var(--space-5);
+  margin-top: var(--space-4);
+}
+
+/* ============================================================
+   CONFIRMATION OVERLAY
+   ============================================================ */
+.confirmation-panel {
+  text-align: center;
+  padding: var(--space-10) var(--space-6);
+}
+.confirmation-icon {
+  margin-bottom: var(--space-4);
+}
+.confirmation-title {
+  margin-bottom: var(--space-2);
+}
+.confirmation-subtitle {
+  font-size: 1.125rem;
+  color: var(--brand-500);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+.confirmation-detail {
+  font-size: 0.875rem;
+  color: var(--neutral-500);
+  margin-bottom: var(--space-1);
+}
 
 /* ============================================================
    UIVERSE LOADERS

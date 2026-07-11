@@ -182,6 +182,92 @@ if ($route === 'toggle-room-status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// ---------- ROOM CRUD ----------
+if ($route === 'create-room' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !AuthService::verifyCsrfToken($input['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'CSRF validation failed']);
+            exit;
+        }
+        $data = [
+            'room_number' => trim($input['room_number'] ?? ''),
+            'room_type' => trim($input['room_type'] ?? ''),
+            'base_rate' => (float)($input['base_rate'] ?? 0),
+            'occupancy' => (int)($input['occupancy'] ?? 1),
+            'bed_count' => (int)($input['bed_count'] ?? 1),
+            'ac' => !empty($input['ac']) ? 1 : 0,
+            'status' => $input['status'] ?? 'available',
+            'description' => trim($input['description'] ?? ''),
+        ];
+        if (empty($data['room_number']) || empty($data['room_type'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Room number and type are required.']);
+            exit;
+        }
+        $result = $ownerService->createRoom($propertyId, $data);
+        echo json_encode(['success' => true, 'room' => $result]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($route === 'update-room' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !AuthService::verifyCsrfToken($input['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'CSRF validation failed']);
+            exit;
+        }
+        $roomId = (int)($input['id'] ?? 0);
+        if ($roomId <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid room ID.']);
+            exit;
+        }
+        $data = [];
+        foreach (['room_number','room_type','base_rate','occupancy','bed_count','ac','status','description'] as $f) {
+            if (isset($input[$f])) $data[$f] = $input[$f];
+        }
+        $ownerService->updateRoom($roomId, $data);
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($route === 'delete-room' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !AuthService::verifyCsrfToken($input['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'CSRF validation failed']);
+            exit;
+        }
+        $roomId = (int)($input['id'] ?? 0);
+        if ($roomId <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid room ID.']);
+            exit;
+        }
+        $ownerService->deleteRoom($roomId);
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // ---------- POST: SCHEDULE UPSERT ----------
 if ($route === 'schedule-upsert' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -243,17 +329,112 @@ if ($route === 'schedule-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// ---------- VIEW ROUTES ----------
-if (in_array($route, ['dashboard', 'inventory', 'alerts', 'staff-scheduling', 'expenses', 'reports'], true)) {
+// ---------- AJAX: EXPENSES ----------
+if ($route === 'api-expenses' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    header('Content-Type: application/json');
+    try {
+        $expenses = $ownerService->getExpenses($propertyId);
+        $summary = $ownerService->getExpenseSummary($propertyId);
+        echo json_encode(['success' => true, 'expenses' => $expenses, 'summary' => $summary]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
 
-    // Gather data for all views
+if ($route === 'expense-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !AuthService::verifyCsrfToken($input['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'CSRF validation failed']);
+            exit;
+        }
+        $id = $ownerService->createExpense($propertyId, $input);
+        echo json_encode(['success' => true, 'id' => $id]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($route === 'expense-update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !AuthService::verifyCsrfToken($input['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'CSRF validation failed']);
+            exit;
+        }
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) { throw new Exception('Invalid expense ID'); }
+        $ownerService->updateExpense($id, $propertyId, $input);
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($route === 'expense-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !AuthService::verifyCsrfToken($input['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'CSRF validation failed']);
+            exit;
+        }
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) { throw new Exception('Invalid expense ID'); }
+        $deleted = $ownerService->deleteExpense($id, $propertyId);
+        echo json_encode(['success' => $deleted]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// ---------- EXPORT: REPORT CSV ----------
+if ($route === 'export-report') {
+    $reportType = $_GET['type'] ?? 'occupancy';
+    $csv = [];
+
+    if ($reportType === 'occupancy') {
+        $data = $ownerService->getOccupancyReport($propertyId, 30);
+        $csv[] = ['Date', 'Occupied Rooms', 'Total Rooms', 'Occupancy %'];
+        foreach ($data as $row) {
+            $pct = ($row['total_rooms'] ?? 1) > 0 ? round(($row['occupied_cnt'] / $row['total_rooms']) * 100, 1) : 0;
+            $csv[] = [$row['date'], (int)$row['occupied_cnt'], (int)$row['total_rooms'], $pct . '%'];
+        }
+    } elseif ($reportType === 'revenue') {
+        $data = $ownerService->getRevenueReport($propertyId);
+        $csv[] = ['Month', 'Bookings', 'Revenue'];
+        foreach ($data as $row) {
+            $csv[] = [$row['month'], (int)$row['bookings'], number_format((float)$row['revenue'], 2)];
+        }
+    }
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $reportType . '-report-' . date('Y-m-d') . '.csv"');
+    $out = fopen('php://output', 'w');
+    foreach ($csv as $line) { fputcsv($out, $line); }
+    fclose($out);
+    exit;
+}
+
+// ---------- VIEW ROUTES ----------
+if ($route === 'dashboard' || $route === 'inventory') {
     $kpis = $ownerService->getKpis($propertyId);
     $occupancyTrend = $ownerService->getOccupancyTrend($propertyId, 7);
     $alerts = $ownerService->getAlerts($propertyId);
     $rooms = $ownerService->getRoomsWithRates($propertyId);
-    $scheduleSummary = $ownerService->getScheduleSummary($propertyId);
-    $schedules = $ownerService->getSchedules($propertyId);
-    $staffUsers = $ownerService->getStaffUsers($propertyId);
     $csrfToken = AuthService::generateCsrfToken();
     $dateToday = date('Y-m-d');
 
@@ -266,30 +447,156 @@ if (in_array($route, ['dashboard', 'inventory', 'alerts', 'staff-scheduling', 'e
         'occupancyTrend'  => $occupancyTrend,
         'alerts'          => $alerts,
         'rooms'           => $rooms,
-        'scheduleSummary' => $scheduleSummary,
-        'schedules'       => $schedules,
-        'staffUsers'      => $staffUsers,
         'csrfToken'       => $csrfToken,
         'dateToday'       => $dateToday,
     ], EXTR_SKIP);
 
-    $viewMap = [
-        'dashboard'        => __DIR__ . '/../../app/Views/owner/console.php',
-        'inventory'        => __DIR__ . '/../../app/Views/owner/console.php',
-        'alerts'           => __DIR__ . '/../../app/Views/owner/alerts.php',
-        'staff-scheduling' => __DIR__ . '/../../app/Views/owner/staff-scheduling.php',
-        'expenses'         => __DIR__ . '/../../app/Views/owner/expenses.php',
-        'reports'          => __DIR__ . '/../../app/Views/owner/reports.php',
-    ];
-
-    $viewFile = $viewMap[$route] ?? __DIR__ . '/../../app/Views/owner/console.php';
+    $viewFile = __DIR__ . '/../../app/Views/owner/console.php';
     include $viewFile;
+    exit;
+}
+
+if ($route === 'alerts') {
+    $alerts = $ownerService->getAlerts($propertyId);
+    extract([
+        'route'           => $route,
+        'property'        => $property,
+        'propertyId'      => $propertyId,
+        'propertyOptions' => $propertyOptions,
+        'alerts'          => $alerts,
+    ], EXTR_SKIP);
+    include __DIR__ . '/../../app/Views/owner/alerts.php';
+    exit;
+}
+
+if ($route === 'staff-scheduling') {
+    $scheduleSummary = $ownerService->getScheduleSummary($propertyId);
+    $staffUsers = $ownerService->getStaffUsers($propertyId);
+    $csrfToken = AuthService::generateCsrfToken();
+    $dateToday = date('Y-m-d');
+    extract([
+        'route'           => $route,
+        'property'        => $property,
+        'propertyId'      => $propertyId,
+        'propertyOptions' => $propertyOptions,
+        'scheduleSummary' => $scheduleSummary,
+        'staffUsers'      => $staffUsers,
+        'csrfToken'       => $csrfToken,
+        'dateToday'       => $dateToday,
+    ], EXTR_SKIP);
+    include __DIR__ . '/../../app/Views/owner/staff-scheduling.php';
+    exit;
+}
+
+if ($route === 'expenses') {
+    $expenses = $ownerService->getExpenses($propertyId);
+    $summary = $ownerService->getExpenseSummary($propertyId);
+    $csrfToken = AuthService::generateCsrfToken();
+    extract([
+        'route'           => $route,
+        'property'        => $property,
+        'propertyId'      => $propertyId,
+        'propertyOptions' => $propertyOptions,
+        'expenses'        => $expenses,
+        'expenseSummary'  => $summary,
+        'csrfToken'       => $csrfToken,
+    ], EXTR_SKIP);
+    include __DIR__ . '/../../app/Views/owner/expenses.php';
+    exit;
+}
+
+if ($route === 'reports') {
+    $occupancyData = $ownerService->getOccupancyReport($propertyId, 30);
+    $revenueData = $ownerService->getRevenueReport($propertyId);
+    extract([
+        'route'           => $route,
+        'property'        => $property,
+        'propertyId'      => $propertyId,
+        'propertyOptions' => $propertyOptions,
+        'occupancyData'   => $occupancyData,
+        'revenueData'     => $revenueData,
+    ], EXTR_SKIP);
+    include __DIR__ . '/../../app/Views/owner/reports.php';
+    exit;
+}
+
+if ($route === 'create-amenity') {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+        exit;
+    }
+    $rawInput = file_get_contents('php://input');
+    $input = json_decode($rawInput, true);
+    if (!isset($input['csrf_token']) || !AuthService::verifyCsrfToken($input['csrf_token'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid or missing CSRF token']);
+        exit;
+    }
+    $label = trim($input['label'] ?? '');
+    $category = trim($input['category'] ?? '');
+    $icon = trim($input['icon'] ?? '');
+    $description = trim($input['description'] ?? '');
+    if (empty($label) || empty($category)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Label and category are required.']);
+        exit;
+    }
+    try {
+        $amenityService = new AmenityService();
+        $result = $amenityService->createAmenity($propertyId, $label, $category, $icon, $description);
+        echo json_encode(['success' => true, 'amenity' => $result]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($route === 'delete-amenity') {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+        exit;
+    }
+    $rawInput = file_get_contents('php://input');
+    $input = json_decode($rawInput, true);
+    if (!isset($input['csrf_token']) || !AuthService::verifyCsrfToken($input['csrf_token'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid or missing CSRF token']);
+        exit;
+    }
+    $amenityKey = trim($input['amenity_key'] ?? '');
+    if (empty($amenityKey)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Amenity key is required.']);
+        exit;
+    }
+    try {
+        $amenityService = new AmenityService();
+        $amenityService->deleteAmenity($amenityKey);
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
     exit;
 }
 
 if ($route === 'property-features') {
     $amenityService = new AmenityService();
     $groupedAmenities = $amenityService->getAmenitiesWithStatusForProperty($propertyId);
+    $csrfToken = AuthService::generateCsrfToken();
+    extract([
+        'route'           => $route,
+        'property'        => $property,
+        'propertyId'      => $propertyId,
+        'propertyOptions' => $propertyOptions,
+        'groupedAmenities'=> $groupedAmenities,
+        'csrfToken'       => $csrfToken,
+    ], EXTR_SKIP);
     include __DIR__ . '/../../app/Views/owner/property-features.php';
     exit;
 }

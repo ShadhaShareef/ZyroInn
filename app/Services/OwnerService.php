@@ -87,22 +87,18 @@ class OwnerService
     {
         $stmt = $this->db->prepare("
             SELECT d.date,
-                   COALESCE(occupied.cnt, 0) as occupied_cnt,
+                   COALESCE(COUNT(DISTINCT b.room_id), 0) as occupied_cnt,
                    r.total_rooms
             FROM (
-                SELECT CURDATE() - INTERVAL (a.a + (10 * b.a)) DAY AS date
-                FROM (SELECT 0 AS a UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6) a
-                CROSS JOIN (SELECT 0 AS a) b
+                SELECT CURDATE() - INTERVAL (a.a) DAY AS date
+                FROM (SELECT 0 a UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6) a
             ) d
             CROSS JOIN (
                 SELECT COUNT(*) as total_rooms FROM rooms WHERE property_id = ?
             ) r
-            LEFT JOIN (
-                SELECT b.check_in_date, b.check_out_date, COUNT(DISTINCT b.room_id) as cnt
-                FROM bookings b
-                WHERE b.property_id = ? AND b.status IN ('confirmed','checked_in','checked_out')
-                GROUP BY b.check_in_date, b.check_out_date
-            ) occupied ON d.date >= occupied.check_in_date AND d.date < occupied.check_out_date
+            LEFT JOIN bookings b ON b.property_id = ? AND b.status IN ('confirmed','checked_in')
+                AND d.date >= b.check_in_date AND d.date < b.check_out_date
+            GROUP BY d.date, r.total_rooms
             ORDER BY d.date ASC
             LIMIT ?
         ");
@@ -165,6 +161,55 @@ class OwnerService
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    // ---------- ROOM CRUD ----------
+
+    public function createRoom(int $propertyId, array $data): array
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO rooms (property_id, room_number, room_type, base_rate, occupancy, bed_count, ac, status, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $propertyId,
+            $data['room_number'],
+            $data['room_type'],
+            (float)($data['base_rate'] ?? 0),
+            (int)($data['occupancy'] ?? 1),
+            (int)($data['bed_count'] ?? 1),
+            !empty($data['ac']) ? 1 : 0,
+            $data['status'] ?? 'available',
+            $data['description'] ?? '',
+        ]);
+        $id = (int)$this->db->lastInsertId();
+        return ['id' => $id, ...$data];
+    }
+
+    public function updateRoom(int $roomId, array $data): void
+    {
+        $fields = [];
+        $params = [];
+        foreach (['room_number','room_type','base_rate','occupancy','bed_count','ac','status','description'] as $f) {
+            if (array_key_exists($f, $data)) {
+                $fields[] = "$f = ?";
+                if ($f === 'ac') {
+                    $params[] = !empty($data[$f]) ? 1 : 0;
+                } elseif (in_array($f, ['base_rate','occupancy','bed_count'])) {
+                    $params[] = (float)$data[$f];
+                } else {
+                    $params[] = $data[$f];
+                }
+            }
+        }
+        if (empty($fields)) return;
+        $params[] = $roomId;
+        $this->db->prepare("UPDATE rooms SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
+    }
+
+    public function deleteRoom(int $roomId): void
+    {
+        $this->db->prepare("DELETE FROM rooms WHERE id = ?")->execute([$roomId]);
     }
 
     // ---------- ALERTS ----------
@@ -313,6 +358,149 @@ class OwnerService
         $stmt = $this->db->prepare("DELETE FROM schedules WHERE id = ? AND property_id = ?");
         $stmt->execute([$scheduleId, $propertyId]);
         return $stmt->rowCount() > 0;
+    }
+
+    // ---------- EXPENSES ----------
+
+    public function getExpenses(int $propertyId, int $limit = 50): array
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT id, title, vendor, amount, category, date, status, notes, created_at
+                FROM expenses
+                WHERE property_id = ?
+                ORDER BY date DESC, created_at DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$propertyId, $limit]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            return [];
+        }
+    }
+
+    public function createExpense(int $propertyId, array $data): int
+    {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO expenses (property_id, title, vendor, amount, category, date, status, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $propertyId,
+                $data['title'],
+                $data['vendor'] ?? null,
+                (float)($data['amount'] ?? 0),
+                $data['category'] ?? null,
+                $data['date'] ?? date('Y-m-d'),
+                $data['status'] ?? 'pending',
+                $data['notes'] ?? null,
+            ]);
+            return (int)$this->db->lastInsertId();
+        } catch (\PDOException $e) {
+            throw new \RuntimeException('Expenses table not available. Run the database migration first.');
+        }
+    }
+
+    public function updateExpense(int $id, int $propertyId, array $data): bool
+    {
+        try {
+            $allowed = ['title', 'vendor', 'amount', 'category', 'date', 'status', 'notes'];
+            $sets = [];
+            $params = [];
+            foreach ($allowed as $field) {
+                if (array_key_exists($field, $data)) {
+                    $sets[] = "`$field` = ?";
+                    $params[] = $data[$field];
+                }
+            }
+            if (empty($sets)) return false;
+            $params[] = $id;
+            $params[] = $propertyId;
+            $sql = "UPDATE expenses SET " . implode(', ', $sets) . " WHERE id = ? AND property_id = ?";
+            $stmt = $this->db->prepare($sql);
+            return $stmt->execute($params);
+        } catch (\PDOException $e) {
+            throw new \RuntimeException('Expenses table not available. Run the database migration first.');
+        }
+    }
+
+    public function deleteExpense(int $id, int $propertyId): bool
+    {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM expenses WHERE id = ? AND property_id = ?");
+            $stmt->execute([$id, $propertyId]);
+            return $stmt->rowCount() > 0;
+        } catch (\PDOException $e) {
+            return false;
+        }
+    }
+
+    public function getExpenseSummary(int $propertyId): array
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE property_id = ? AND MONTH(date) = MONTH(CURDATE()) AND YEAR(date) = YEAR(CURDATE())");
+            $stmt->execute([$propertyId]);
+            $monthly = (float)$stmt->fetchColumn();
+
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM expenses WHERE property_id = ? AND status = 'pending'");
+            $stmt->execute([$propertyId]);
+            $pending = (int)$stmt->fetchColumn();
+
+            $stmt = $this->db->prepare("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE property_id = ? AND status = 'pending'");
+            $stmt->execute([$propertyId]);
+            $pendingAmount = (float)$stmt->fetchColumn();
+
+            return [
+                'monthly_spend' => $monthly,
+                'pending_count' => $pending,
+                'pending_amount' => $pendingAmount,
+            ];
+        } catch (\PDOException $e) {
+            return ['monthly_spend' => 0, 'pending_count' => 0, 'pending_amount' => 0];
+        }
+    }
+
+    // ---------- REPORTS ----------
+
+    public function getOccupancyReport(int $propertyId, int $days = 30): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT d.date,
+                   COUNT(DISTINCT b.room_id) as occupied_cnt,
+                   r.total_rooms
+            FROM (
+                SELECT CURDATE() - INTERVAL (a.a) DAY AS date
+                FROM (SELECT 0 a UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15 UNION SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19 UNION SELECT 20 UNION SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24 UNION SELECT 25 UNION SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29) a
+            ) d
+            CROSS JOIN (
+                SELECT COUNT(*) as total_rooms FROM rooms WHERE property_id = ?
+            ) r
+            LEFT JOIN bookings b ON b.property_id = ? AND b.status IN ('confirmed','checked_in')
+                AND d.date >= b.check_in_date AND d.date < b.check_out_date
+            GROUP BY d.date, r.total_rooms
+            ORDER BY d.date ASC
+            LIMIT ?
+        ");
+        $stmt->execute([$propertyId, $propertyId, $days]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getRevenueReport(int $propertyId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT DATE_FORMAT(b.check_in_date, '%Y-%m') as month,
+                   COUNT(DISTINCT b.id) as bookings,
+                   COALESCE(SUM(p.amount),0) as revenue
+            FROM bookings b
+            LEFT JOIN payments p ON p.booking_id = b.id AND p.status = 'completed'
+            WHERE b.property_id = ? AND b.status NOT IN ('cancelled')
+            GROUP BY DATE_FORMAT(b.check_in_date, '%Y-%m')
+            ORDER BY month ASC
+            LIMIT 12
+        ");
+        $stmt->execute([$propertyId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     // ---------- UTILITY ----------

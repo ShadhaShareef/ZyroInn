@@ -9,10 +9,12 @@ $booking = array_merge([
   'check_in_date' => '', 'check_out_date' => '',
   'base_rate' => 0, 'first_name' => '', 'last_name' => '',
 ], $booking);
+$fnbItems = $fnbItems ?? [];
 $nights = max(1, (strtotime($booking['check_out_date']) - strtotime($booking['check_in_date'])) / 86400);
 $roomTotal = $nights * (float)$booking['base_rate'];
 $addonTotal = array_sum(array_map(fn($a) => (float)$a['price'] * (int)$a['quantity'], $addons));
-$grandTotal = $roomTotal + $addonTotal;
+$fnbTotal = array_sum(array_map(fn($i) => (float)$i['item_price'] * (int)$i['quantity'], $fnbItems));
+$grandTotal = $roomTotal + $addonTotal + $fnbTotal;
 $paidAmount = !empty($payments) ? (float)$payments[0]['amount'] : 0;
 $txnRef = !empty($payments) ? $payments[0]['transaction_reference'] : '--';
 ?>
@@ -112,6 +114,17 @@ $txnRef = !empty($payments) ? $payments[0]['transaction_reference'] : '--';
             <td class="text-right">$<?= number_format((float)$addon['price'] * (int)$addon['quantity'], 2) ?></td>
           </tr>
           <?php endforeach; ?>
+          <?php if (!empty($fnbItems)): ?>
+          <tr><td colspan="4" style="font-size:0.6875rem; color:#888; text-transform:uppercase; letter-spacing:0.06em; padding-top:1rem;">Services &amp; F&B</td></tr>
+          <?php foreach ($fnbItems as $fi): ?>
+          <tr>
+            <td><?= htmlspecialchars($fi['item_name']) ?></td>
+            <td class="text-right">x<?= (int)$fi['quantity'] ?></td>
+            <td class="text-right">$<?= number_format($fi['item_price'], 2) ?></td>
+            <td class="text-right">$<?= number_format((float)$fi['item_price'] * (int)$fi['quantity'], 2) ?></td>
+          </tr>
+          <?php endforeach; ?>
+          <?php endif; ?>
           <tr class="total-row">
             <td colspan="3" class="text-right">Total</td>
             <td class="text-right">$<?= number_format($grandTotal, 2) ?></td>
@@ -131,7 +144,44 @@ $txnRef = !empty($payments) ? $payments[0]['transaction_reference'] : '--';
       </div>
     </div>
 
-    <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+    <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
+      <button class="print-btn" style="flex:1;" onclick="window.print()">Print / Save as PDF</button>
+      <button id="email-bill-btn" class="print-btn" style="flex:1; background:#16a34a;" onclick="emailBill()">Send to Email</button>
+    </div>
+    <p id="email-status" style="text-align:center; font-size:0.75rem; margin-top:0.75rem; color:#888;"></p>
   </div>
+  <script>
+  function emailBill() {
+    var btn = document.getElementById('email-bill-btn');
+    var status = document.getElementById('email-status');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    status.textContent = '';
+    fetch('index.php?route=send-bill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'booking_id=<?= (int)$booking['id'] ?>&csrf_token=<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        status.style.color = '#16a34a';
+        status.textContent = data.message;
+        btn.textContent = 'Sent';
+      } else {
+        status.style.color = '#dc2626';
+        status.textContent = data.error || 'Failed to send.';
+        btn.disabled = false;
+        btn.textContent = 'Send to Email';
+      }
+    })
+    .catch(function() {
+      status.style.color = '#dc2626';
+      status.textContent = 'Network error.';
+      btn.disabled = false;
+      btn.textContent = 'Send to Email';
+    });
+  }
+  </script>
 </body>
 </html>

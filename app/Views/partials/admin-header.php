@@ -111,8 +111,6 @@ $adminNavItems = [
             <h2 class="text-lg font-semibold text-brand-900"><?= htmlspecialchars($title ?? 'Platform Admin') ?></h2>
           </div>
           <div class="flex items-center gap-4">
-            <a href="<?= BASE_URL ?>/owner/index.php" class="hidden md:inline text-xs font-semibold text-neutral-500 hover:text-brand-600 transition">Owner Portal</a>
-            <a href="<?= BASE_URL ?>/staff/index.php" class="hidden md:inline text-xs font-semibold text-neutral-500 hover:text-brand-600 transition">Staff Portal</a>
             <a href="index.php?route=logout" class="text-xs font-semibold text-neutral-500 hover:text-rose-600 transition">Log Out</a>
             <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-brand-700 font-bold text-sm">
               <?= strtoupper(substr($_SESSION['first_name'] ?? 'A', 0, 1) . substr($_SESSION['last_name'] ?? 'U', 0, 1)) ?>

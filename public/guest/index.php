@@ -1452,7 +1452,7 @@ elseif ($route === 'services') {
             } else {
                 $fnbCategories = ['starter', 'main_course', 'dessert', 'beverage'];
                 $isFnb = in_array($selectedService['category'], $fnbCategories);
-                $orderType = $isFnb ? 'fnb_order' : 'service';
+                $orderType = $isFnb ? 'restaurant' : 'service';
 
                 if (!$isFnb && (empty($scheduledAt) || !strtotime($scheduledAt))) {
                     $bookingError = 'Please provide a valid date and time.';
@@ -1502,7 +1502,114 @@ elseif ($route === 'services') {
         }
     }
 
+    // Also fetch any existing F&B pending/preparing orders for status display
+    $existingOrders = [];
+    $orderSt = $db->prepare("
+        SELECT id, status, total_amount, notes, created_at
+        FROM fnb_orders
+        WHERE booking_id = ? AND order_type = 'room_service'
+        ORDER BY created_at DESC
+    ");
+    $orderSt->execute([$bookingId]);
+    $existingOrders = $orderSt->fetchAll();
+    foreach ($existingOrders as &$eo) {
+        $itemSt = $db->prepare("
+            SELECT oi.*, mi.name
+            FROM fnb_order_items oi
+            JOIN fnb_menu_items mi ON oi.menu_item_id = mi.id
+            WHERE oi.order_id = ?
+        ");
+        $itemSt->execute([$eo['id']]);
+        $eo['items'] = $itemSt->fetchAll();
+    }
+    unset($eo);
+
     include __DIR__ . '/../../app/Views/guest/services.php';
+    exit;
+}
+
+// ----------------------------------------------------
+// ROUTE: Place Order (multi-item F&B, AJAX)
+// ----------------------------------------------------
+elseif ($route === 'place_order' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    AuthService::requireAuth(['guest']);
+    $guestId = (int)$_SESSION['guest_id'];
+
+    if (!AuthService::verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Security token validation failed.']);
+        exit;
+    }
+
+    $bookingId = (int)($_POST['booking_id'] ?? 0);
+    $propertyId = (int)($_POST['property_id'] ?? 0);
+    $rawItems = json_decode($_POST['items'] ?? '[]', true);
+    $notes = trim($_POST['notes'] ?? '');
+
+    if ($bookingId <= 0 || $propertyId <= 0 || empty($rawItems)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing required fields.']);
+        exit;
+    }
+
+    // Verify booking belongs to this guest
+    $stmt = $db->prepare("SELECT id FROM bookings WHERE id = ? AND guest_id = ? AND property_id = ?");
+    $stmt->execute([$bookingId, $guestId, $propertyId]);
+    if (!$stmt->fetch()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Booking not found.']);
+        exit;
+    }
+
+    // Look up menu items (must be available and belong to this property)
+    $placeholders = implode(',', array_fill(0, count($rawItems), '?'));
+    $params = $rawItems;
+    $params[] = $propertyId;
+    $stmt = $db->prepare("
+        SELECT id, name, price, category
+        FROM fnb_menu_items
+        WHERE id IN ($placeholders) AND property_id = ? AND available = 1
+          AND category IN ('starter', 'main_course', 'dessert', 'beverage')
+    ");
+    $stmt->execute($params);
+    $dbItems = $stmt->fetchAll();
+
+    if (count($dbItems) !== count($rawItems)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Some items are unavailable or invalid.']);
+        exit;
+    }
+
+    $totalAmount = 0;
+    foreach ($dbItems as $mi) {
+        $totalAmount += (float)$mi['price'];
+    }
+
+    $db->beginTransaction();
+    try {
+        $orderStmt = $db->prepare("
+            INSERT INTO fnb_orders (property_id, booking_id, order_type, scheduled_at, status, notes, total_amount)
+            VALUES (?, ?, 'room_service', NOW(), 'pending', ?, ?)
+        ");
+        $orderStmt->execute([$propertyId, $bookingId, $notes, $totalAmount]);
+        $orderId = $db->lastInsertId();
+
+        $itemStmt = $db->prepare("
+            INSERT INTO fnb_order_items (order_id, menu_item_id, quantity, price)
+            VALUES (?, ?, 1, ?)
+        ");
+        foreach ($dbItems as $mi) {
+            $itemStmt->execute([$orderId, $mi['id'], $mi['price']]);
+        }
+
+        $db->commit();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'order_id' => $orderId, 'total' => $totalAmount]);
+    } catch (Exception $e) {
+        $db->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to place order: ' . $e->getMessage()]);
+    }
     exit;
 }
 
@@ -1610,6 +1717,91 @@ elseif ($route === 'group-book') {
 }
 
 // ----------------------------------------------------
+// ROUTE: Send E-Bill via Email (AJAX POST)
+// ----------------------------------------------------
+elseif ($route === 'send-bill' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    AuthService::requireAuth(['guest']);
+    $guestId = (int)$_SESSION['guest_id'];
+    $bookingId = isset($_POST['booking_id']) ? (int)$_POST['booking_id'] : 0;
+
+    if ($bookingId <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid booking.']);
+        exit;
+    }
+
+    $stmt = $db->prepare("
+        SELECT b.*, r.room_number, r.room_type, r.base_rate, p.name AS property_name, p.address, p.city, p.state, p.country
+        FROM bookings b
+        JOIN rooms r ON b.room_id = r.id
+        JOIN properties p ON b.property_id = p.id
+        WHERE b.id = ? AND b.guest_id = ?
+    ");
+    $stmt->execute([$bookingId, $guestId]);
+    $booking = $stmt->fetch();
+
+    if (!$booking) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Booking not found.']);
+        exit;
+    }
+
+    $addonStmt = $db->prepare("SELECT * FROM booking_addons WHERE booking_id = ?");
+    $addonStmt->execute([$bookingId]);
+    $addons = $addonStmt->fetchAll();
+
+    $payStmt = $db->prepare("SELECT * FROM payments WHERE booking_id = ?");
+    $payStmt->execute([$bookingId]);
+    $payments = $payStmt->fetchAll();
+
+    // Fetch F&B orders and items
+    $fnbStmt = $db->prepare("
+        SELECT fo.*, foi.quantity, foi.price AS item_price, fmi.name AS item_name
+        FROM fnb_orders fo
+        JOIN fnb_order_items foi ON foi.order_id = fo.id
+        JOIN fnb_menu_items fmi ON fmi.id = foi.menu_item_id
+        WHERE fo.booking_id = ? AND fo.status != 'cancelled'
+        ORDER BY fo.created_at
+    ");
+    $fnbStmt->execute([$bookingId]);
+    $fnbItems = $fnbStmt->fetchAll();
+
+    $nights = max(1, (strtotime($booking['check_out_date']) - strtotime($booking['check_in_date'])) / 86400);
+    $roomTotal = $nights * (float)$booking['base_rate'];
+    $addonTotal = array_sum(array_map(fn($a) => (float)$a['price'] * (int)$a['quantity'], $addons));
+    $fnbTotal = array_sum(array_map(fn($i) => (float)$i['item_price'] * (int)$i['quantity'], $fnbItems));
+    $grandTotal = $roomTotal + $addonTotal + $fnbTotal;
+    $txnRef = !empty($payments) ? $payments[0]['transaction_reference'] : '--';
+
+    $guestEmail = $_SESSION['email'] ?? '';
+    if (empty($guestEmail)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'No email address on file.']);
+        exit;
+    }
+
+    ob_start();
+    include __DIR__ . '/../../app/Views/guest/bill-email.php';
+    $htmlBody = ob_get_clean();
+
+    $mailer = new \App\Services\MailService();
+    $success = $mailer->send(
+        $guestEmail,
+        'E-Bill - ZyroInn Booking #BKG-' . str_pad($bookingId, 5, '0', STR_PAD_LEFT),
+        $htmlBody
+    );
+
+    header('Content-Type: application/json');
+    if ($success) {
+        echo json_encode(['success' => true, 'message' => 'E-Bill sent to ' . htmlspecialchars($guestEmail)]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to send email.']);
+    }
+    exit;
+}
+
+// ----------------------------------------------------
 // ROUTE: E-Bill Download
 // ----------------------------------------------------
 elseif ($route === 'bill') {
@@ -1644,6 +1836,19 @@ elseif ($route === 'bill') {
     $payStmt = $db->prepare("SELECT * FROM payments WHERE booking_id = ?");
     $payStmt->execute([$bookingId]);
     $payments = $payStmt->fetchAll();
+
+    // Fetch F&B orders and items for the bill
+    $fnbOrders = [];
+    $fnbStmt = $db->prepare("
+        SELECT fo.*, foi.quantity, foi.price AS item_price, fmi.name AS item_name
+        FROM fnb_orders fo
+        JOIN fnb_order_items foi ON foi.order_id = fo.id
+        JOIN fnb_menu_items fmi ON fmi.id = foi.menu_item_id
+        WHERE fo.booking_id = ? AND fo.status != 'cancelled'
+        ORDER BY fo.created_at
+    ");
+    $fnbStmt->execute([$bookingId]);
+    $fnbItems = $fnbStmt->fetchAll();
 
     include __DIR__ . '/../../app/Views/guest/bill.php';
     exit;

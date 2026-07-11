@@ -174,4 +174,56 @@ class AmenityService {
         }
         return $grouped;
     }
+
+    public function createAmenity(int $propertyId, string $label, string $category, string $icon = '', string $description = ''): array
+    {
+        $db = Database::getConnection();
+        $key = $this->generateAmenityKey($label);
+
+        $stmt = $db->prepare("SELECT id FROM amenities WHERE `key` = ?");
+        $stmt->execute([$key]);
+        if ($stmt->fetch()) {
+            $i = 1;
+            while (true) {
+                $tryKey = $key . '_' . $i;
+                $stmt->execute([$tryKey]);
+                if (!$stmt->fetch()) { $key = $tryKey; break; }
+                $i++;
+            }
+        }
+
+        $stmt = $db->prepare("INSERT INTO amenities (`key`, label, category, description, scope, icon, active) VALUES (?, ?, ?, ?, 'property', ?, 1)");
+        $stmt->execute([$key, $label, $category, $description, $icon]);
+        $amenityId = (int)$db->lastInsertId();
+
+        $stmt = $db->prepare("INSERT INTO property_amenities (property_id, amenity_id, enabled) VALUES (?, ?, 1)");
+        $stmt->execute([$propertyId, $amenityId]);
+
+        return ['id' => $amenityId, 'key' => $key, 'label' => $label, 'category' => $category, 'icon' => $icon, 'enabled' => true];
+    }
+
+    public function deleteAmenity(string $amenityKey): void
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT id FROM amenities WHERE `key` = ?");
+        $stmt->execute([$amenityKey]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new InvalidArgumentException("Amenity key '{$amenityKey}' not found.");
+        }
+        $amenityId = (int)$row['id'];
+        $stmt = $db->prepare("DELETE FROM property_amenities WHERE amenity_id = ?");
+        $stmt->execute([$amenityId]);
+        $stmt = $db->prepare("UPDATE amenities SET active = 0 WHERE id = ?");
+        $stmt->execute([$amenityId]);
+    }
+
+    private function generateAmenityKey(string $label): string
+    {
+        $key = strtolower(trim($label));
+        $key = preg_replace('/[^a-z0-9]+/', '_', $key);
+        $key = trim($key, '_');
+        $key = preg_replace('/_+/', '_', $key);
+        return $key;
+    }
 }
