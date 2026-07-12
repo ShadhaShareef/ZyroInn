@@ -18,6 +18,7 @@
         <a href="index.php?route=bookings" class="site-footer-link">My Bookings</a>
         <a href="index.php?route=profile" class="site-footer-link">My Profile</a>
         <a href="index.php?route=messages" class="site-footer-link">Messages</a>
+        <a href="<?= BASE_URL ?>/partner/index.php" class="site-footer-link">List Your Property</a>
       </div>
     </div>
 

@@ -26,6 +26,7 @@ $routeLabels = [
   'bookings' => 'My Bookings', 'profile' => 'My Profile',
   'messages' => 'Messages', 'services' => 'Services',
   'pre-arrival' => 'Pre-Arrival Check-In', 'loyalty-history' => 'Loyalty History',
+  'about' => 'About Us',
 ];
 $currentLabel = $routeLabels[$route] ?? 'ZyroInn';
 
@@ -34,12 +35,14 @@ if (empty($navItems)) {
   $navItems = [
     ['href' => 'index.php?route=home', 'label' => 'Home', 'active' => $route === 'home'],
     ['href' => 'index.php?route=search', 'label' => 'Browse Stays', 'active' => $route === 'search'],
+    ['href' => 'index.php?route=about', 'label' => 'About Us', 'active' => $route === 'about'],
     ['href' => 'index.php?route=book', 'label' => 'Book Now', 'active' => $route === 'book'],
   ];
   if ($isLoggedIn) {
     $navItems = [
       ['href' => 'index.php?route=home', 'label' => 'Home', 'active' => $route === 'home'],
       ['href' => 'index.php?route=search', 'label' => 'Browse Stays', 'active' => $route === 'search'],
+      ['href' => 'index.php?route=about', 'label' => 'About Us', 'active' => $route === 'about'],
       ['href' => 'index.php?route=bookings', 'label' => 'My Bookings', 'active' => $route === 'bookings'],
       ['href' => 'index.php?route=messages', 'label' => 'Messages', 'active' => $route === 'messages'],
       ['href' => 'index.php?route=services', 'label' => 'Services', 'active' => $route === 'services'],

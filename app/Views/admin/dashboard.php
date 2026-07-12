@@ -30,16 +30,28 @@ include __DIR__ . '/../partials/admin-header.php';
   <!-- Alert Badges -->
   <div class="flex flex-wrap gap-3">
     <?php if ($pendingOnboarding > 0): ?>
-      <a href="index.php?route=onboarding" class="rounded-pill bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition">📋 <?= $pendingOnboarding ?> pending onboarding</a>
+      <a href="index.php?route=onboarding" class="inline-flex items-center gap-2 rounded-pill bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition">
+        <span class="w-4 h-4 text-amber-600"><?= svg_icon('clipboard') ?></span>
+        <?= $pendingOnboarding ?> pending onboarding
+      </a>
     <?php endif; ?>
     <?php if ($openTickets > 0): ?>
-      <a href="index.php?route=support" class="rounded-pill bg-rose-50 border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 transition">🎫 <?= $openTickets ?> open tickets</a>
+      <a href="index.php?route=support" class="inline-flex items-center gap-2 rounded-pill bg-rose-50 border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 transition">
+        <span class="w-4 h-4 text-rose-600"><?= svg_icon('concierge') ?></span>
+        <?= $openTickets ?> open tickets
+      </a>
     <?php endif; ?>
     <?php if ($pendingReviews > 0): ?>
-      <a href="index.php?route=moderation" class="rounded-pill bg-blue-50 border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 transition">✏️ <?= $pendingReviews ?> reviews to moderate</a>
+      <a href="index.php?route=moderation" class="inline-flex items-center gap-2 rounded-pill bg-blue-50 border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 transition">
+        <span class="w-4 h-4 text-blue-600"><?= svg_icon('check') ?></span>
+        <?= $pendingReviews ?> reviews to moderate
+      </a>
     <?php endif; ?>
     <?php if ($openFlags > 0): ?>
-      <a href="index.php?route=fraud" class="rounded-pill bg-red-50 border border-red-200 px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 transition">🚨 <?= $openFlags ?> active fraud flags</a>
+      <a href="index.php?route=fraud" class="inline-flex items-center gap-2 rounded-pill bg-red-50 border border-red-200 px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 transition">
+        <span class="w-4 h-4 text-red-600"><?= svg_icon('shield') ?></span>
+        <?= $openFlags ?> active fraud flags
+      </a>
     <?php endif; ?>
   </div>
 

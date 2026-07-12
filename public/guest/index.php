@@ -101,10 +101,24 @@ $navItems = [
         'icon' => 'P',
         'href' => 'index.php?route=profile',
         'active' => ($route === 'profile')
-    ]
+    ],
+    [
+        'label' => 'About',
+        'icon' => 'A',
+        'href' => 'index.php?route=about',
+        'active' => ($route === 'about')
+    ],
 ];
 
 // ----------------------------------------------------
+// ----------------------------------------------------
+// ROUTE: ABOUT US
+// ----------------------------------------------------
+if ($route === 'about') {
+    include __DIR__ . '/../../app/Views/guest/about.php';
+    exit;
+}
+
 // ROUTE: Home / Destination Discovery
 // ----------------------------------------------------
 if ($route === 'home') {

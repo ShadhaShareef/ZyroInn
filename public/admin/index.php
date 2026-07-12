@@ -498,6 +498,123 @@ if ($route === 'disputes') {
     exit;
 }
 
+// --------------- ROUTE: AUDIT LOG ---------------
+if ($route === 'audit-log') {
+    $db = Database::getConnection();
+
+    $actionLabels = [
+        'property_approved'      => 'Approved property onboarding',
+        'property_rejected'      => 'Rejected property onboarding',
+        'commission_rate_changed'=> 'Changed commission rate',
+        'commission_paid'        => 'Approved commission payout',
+        'dispute_resolved'       => 'Resolved dispute',
+        'dispute_dismissed'      => 'Dismissed dispute',
+        'review_moderated'       => 'Moderated guest review',
+        'review_deleted'         => 'Deleted guest review',
+        'ticket_status_changed'  => 'Updated support ticket status',
+        'ticket_assigned'        => 'Assigned support ticket',
+        'fraud_resolved'         => 'Resolved fraud flag',
+        'fraud_dismissed'        => 'Dismissed fraud flag',
+    ];
+
+    $entityTypeLabels = [
+        'property'   => 'Property',
+        'commission' => 'Commission',
+        'dispute'    => 'Dispute',
+        'review'     => 'Review',
+        'ticket'     => 'Support Ticket',
+        'fraud'      => 'Fraud Flag',
+    ];
+
+    $filterAdmin = $_GET['admin'] ?? '';
+    $filterAction = $_GET['action'] ?? '';
+    $filterEntity = $_GET['entity'] ?? '';
+    $filterDateFrom = $_GET['date_from'] ?? '';
+    $filterDateTo = $_GET['date_to'] ?? '';
+
+    // Build query with filters
+    $query = "
+        SELECT al.*, u.first_name, u.last_name
+        FROM audit_log al
+        JOIN users u ON al.admin_user_id = u.id
+        WHERE 1=1
+    ";
+    $countQuery = "SELECT COUNT(*) FROM audit_log al JOIN users u ON al.admin_user_id = u.id WHERE 1=1";
+    $params = [];
+
+    if ($filterAdmin !== '') {
+        $query .= " AND CONCAT(u.first_name, ' ', u.last_name) = ?";
+        $countQuery .= " AND CONCAT(u.first_name, ' ', u.last_name) = ?";
+        $params[] = $filterAdmin;
+    }
+    if ($filterAction !== '') {
+        $query .= " AND al.action = ?";
+        $countQuery .= " AND al.action = ?";
+        $params[] = $filterAction;
+    }
+    if ($filterEntity !== '') {
+        $query .= " AND al.entity_type = ?";
+        $countQuery .= " AND al.entity_type = ?";
+        $params[] = $filterEntity;
+    }
+    if ($filterDateFrom !== '') {
+        $query .= " AND al.created_at >= ?";
+        $countQuery .= " AND al.created_at >= ?";
+        $params[] = $filterDateFrom;
+    }
+    if ($filterDateTo !== '') {
+        $query .= " AND al.created_at <= ?";
+        $countQuery .= " AND al.created_at <= ?";
+        $params[] = $filterDateTo . ' 23:59:59';
+    }
+
+    $query .= " ORDER BY al.created_at DESC";
+
+    // Pagination
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = 10;
+
+    $countStmt = $db->prepare($countQuery);
+    $countStmt->execute($params);
+    $totalEntries = (int)$countStmt->fetchColumn();
+    $totalPages = max(1, (int)ceil($totalEntries / $perPage));
+    if ($page > $totalPages) $page = $totalPages;
+    $offset = ($page - 1) * $perPage;
+
+    $query .= " LIMIT ? OFFSET ?";
+    $params[] = $perPage;
+    $params[] = $offset;
+
+    $stmt = $db->prepare($query);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+
+    // Build entries with computed admin_user_name and entity_label
+    $entries = [];
+    foreach ($rows as $row) {
+        $adminName = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+        $entityLabel = $entityTypeLabels[$row['entity_type']] ?? $row['entity_type'];
+        // Build a descriptive entity label based on type
+        $entityLabelText = $entityLabel . ' #' . (int)$row['entity_id'];
+        $entries[] = [
+            'id'              => (int)$row['id'],
+            'admin_user_name' => $adminName ?: 'Unknown Admin',
+            'action'          => $row['action'],
+            'entity_type'     => $row['entity_type'],
+            'entity_id'       => (int)$row['entity_id'],
+            'entity_label'    => $entityLabelText,
+            'details'         => $row['details'] ?? '{}',
+            'created_at'      => $row['created_at'],
+        ];
+    }
+
+    // Unique admin names for filter dropdown
+    $adminNames = $db->query("SELECT DISTINCT CONCAT(first_name, ' ', last_name) FROM users WHERE role IN ('admin','manager') ORDER BY first_name")->fetchAll(\PDO::FETCH_COLUMN);
+
+    include __DIR__ . '/../../app/Views/admin/audit-log.php';
+    exit;
+}
+
 if ($route === 'logout') {
     \App\Services\AuthService::logout();
     header("Location: " . BASE_URL . "/auth/login.php?surface=admin");
